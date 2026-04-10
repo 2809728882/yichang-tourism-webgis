@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import MapView from "./components/MapView";
 
@@ -65,6 +65,22 @@ export default function App() {
       .filter((x) => Boolean(x.poi))
       .map(({ stop, poi }) => ({ lat: poi.location.lat, lng: poi.location.lng, order: stop.order, name: stop.poiName }));
   }, [planResult, pois]);
+
+  const poiViewData = useMemo(() => {
+    const op = realtime?.poiOperational || {};
+    return pois.map((poi) => {
+      const metric = op[poi.id];
+      if (!metric) return poi;
+      return {
+        ...poi,
+        ticketRemain: metric.ticketRemain,
+        crowdLevel: metric.crowdLevel,
+        metricSource: metric.source,
+        metricUpdatedAt: metric.updatedAt,
+        metricFormulas: metric.formulas
+      };
+    });
+  }, [pois, realtime]);
 
   useEffect(() => {
     async function buildRoadLine() {
@@ -280,7 +296,7 @@ export default function App() {
 
       <main className="map-stage">
         <MapView
-          pois={pois}
+          pois={poiViewData}
           focusPoiId={focusPoiId}
           activePoiId={activePoiId}
           heatData={realtime?.crowdHeat}
@@ -295,6 +311,13 @@ export default function App() {
             交通指数：{realtime?.trafficIndex ?? "--"}
             {trafficWarning ? <span className="warn" title={trafficWarning}> ⚠️</span> : null}
           </div>
+          <div title={realtime?.metricDefinitions?.ticketRemain?.formula || ""}>
+            门票余量口径：{realtime?.metricDefinitions?.ticketRemain?.source || "--"}
+          </div>
+          <div title={realtime?.metricDefinitions?.crowdPercent?.formula || ""}>
+            拥挤度口径：{realtime?.metricDefinitions?.crowdPercent?.source || "--"}
+          </div>
+          <div>更新时间：{realtime?.metricDefinitions?.crowdPercent?.updatedAt ? new Date(realtime.metricDefinitions.crowdPercent.updatedAt).toLocaleString() : "--"}</div>
           <label className="replan-toggle">
             <input type="checkbox" checked={replanEnabled} onChange={(e) => setReplanEnabled(e.target.checked)} />
             实时重规划

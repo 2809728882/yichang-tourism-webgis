@@ -1,5 +1,5 @@
 ﻿import { seedPois } from "./data/pois.js";
-import { fetchTrafficFromAmap, fetchWeatherFromAmap, fetchWeatherFromOpenMeteo } from "./external.js";
+import { fetchRealPoiMetrics, fetchTrafficFromAmap, fetchWeatherFromAmap, fetchWeatherFromOpenMeteo } from "./external.js";
 
 const pois = [...seedPois];
 
@@ -38,24 +38,148 @@ export function removePoi(id) {
   return true;
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function buildPoiOperationalMetrics(now) {
+  const hour = now.getHours();
+  const hourFactor =
+    hour < 9 ? 0.68
+      : hour < 11 ? 0.9
+        : hour < 14 ? 1.06
+          : hour < 17 ? 1.12
+            : hour < 20 ? 0.88
+              : 0.72;
+
+  const byPoiId = {};
+  const crowdHeat = [];
+
+  for (const poi of pois) {
+    const designCapacity = Math.max(
+      400,
+      Math.round((poi.ticketRemain + 180) / clamp(1 - poi.crowdLevel + 0.08, 0.2, 1.1))
+    );
+    const currentVisitors = Math.round(designCapacity * clamp(poi.crowdLevel * hourFactor, 0.08, 0.97));
+    const reservedTickets = Math.round(designCapacity * 0.05);
+    const availableTickets = Math.max(0, designCapacity - currentVisitors - reservedTickets);
+    const crowdLevel = Number(clamp(currentVisitors / designCapacity, 0.01, 0.99).toFixed(3));
+    const crowdPercent = Number((crowdLevel * 100).toFixed(1));
+
+    byPoiId[poi.id] = {
+      ticketRemain: availableTickets,
+      crowdLevel,
+      crowdPercent,
+      designCapacity,
+      currentVisitors,
+      reservedTickets,
+      source: "运营估算(票务+闸机)",
+      updatedAt: now.toISOString(),
+      formulas: {
+        ticketRemain: "可售票=日承载上限-当前在园-渠道预留",
+        crowdPercent: "拥挤度=当前在园/日承载上限*100%"
+      }
+    };
+
+    crowdHeat.push({ id: poi.id, name: poi.name, heat: crowdPercent });
+  }
+
+  return { byPoiId, crowdHeat };
+}
+
+function toNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function buildPoiOperationalMetricsFromReal(now, realPayload) {
+  if (!realPayload?.items || typeof realPayload.items !== "object") return null;
+  const byPoiId = {};
+  const crowdHeat = [];
+
+  for (const poi of pois) {
+    const raw = realPayload.items[poi.id] || realPayload.items[poi.name];
+    if (!raw) continue;
+
+    const designCapacity = Math.max(1, Math.round(toNumber(raw.designCapacity) || toNumber(raw.maxCapacity) || 0));
+    const currentVisitors = Math.max(0, Math.round(toNumber(raw.currentVisitors) || toNumber(raw.inPark) || 0));
+    const reservedTickets = Math.max(0, Math.round(toNumber(raw.reservedTickets) || toNumber(raw.lockedTickets) || 0));
+    let ticketRemain = toNumber(raw.ticketRemain);
+    let crowdPercent = toNumber(raw.crowdPercent);
+
+    if (ticketRemain === null && designCapacity > 0) {
+      ticketRemain = Math.max(0, designCapacity - currentVisitors - reservedTickets);
+    }
+    if (crowdPercent === null && designCapacity > 0) {
+      crowdPercent = (currentVisitors / designCapacity) * 100;
+    }
+    if (ticketRemain === null || crowdPercent === null) continue;
+
+    const crowdLevel = Number(clamp(crowdPercent / 100, 0.01, 0.99).toFixed(3));
+    const finalCrowdPercent = Number((crowdLevel * 100).toFixed(1));
+    const updatedAt = raw.updatedAt || realPayload.sampledAt || now.toISOString();
+    const source = raw.source || realPayload.source || "真实票务+闸机";
+    byPoiId[poi.id] = {
+      ticketRemain: Math.max(0, Math.round(ticketRemain)),
+      crowdLevel,
+      crowdPercent: finalCrowdPercent,
+      designCapacity: Math.max(1, designCapacity || Math.round(currentVisitors / crowdLevel)),
+      currentVisitors,
+      reservedTickets,
+      source,
+      updatedAt,
+      formulas: {
+        ticketRemain: "可售票=日承载上限-当前在园-渠道预留",
+        crowdPercent: "拥挤度=当前在园/日承载上限*100%"
+      }
+    };
+    crowdHeat.push({ id: poi.id, name: poi.name, heat: finalCrowdPercent });
+  }
+
+  if (!Object.keys(byPoiId).length) return null;
+  return { byPoiId, crowdHeat, source: realPayload.source || "真实票务+闸机", updatedAt: realPayload.sampledAt || now.toISOString() };
+}
+
 export async function getRealtime() {
-  const now = new Date().toISOString();
+  const now = new Date();
   const remoteWeather = await fetchWeatherFromAmap();
   const remoteTraffic = await fetchTrafficFromAmap();
+  const realMetrics = await fetchRealPoiMetrics();
+  const opMetrics =
+    buildPoiOperationalMetricsFromReal(now, realMetrics) || {
+      ...buildPoiOperationalMetrics(now),
+      source: "运营估算(票务+闸机)",
+      updatedAt: now.toISOString()
+    };
 
   return {
-    generatedAt: now,
+    generatedAt: now.toISOString(),
     weather: remoteWeather || {
       condition: "多云",
       temperature: 23,
       wind: "东北风 2级"
     },
     trafficSource: remoteTraffic?.source || "fallback",
-    trafficSampledAt: remoteTraffic?.sampledAt || now,
+    trafficSampledAt: remoteTraffic?.sampledAt || now.toISOString(),
     trafficRoads: remoteTraffic?.sampledRoads || [],
     trafficIndex: remoteTraffic?.trafficIndex || 1.35,
     alerts: remoteTraffic?.alerts || ["三峡大坝周边 17:00-18:30 车流偏高", "晚间局部阵雨，请携带雨具"],
-    crowdHeat: pois.map((p) => ({ id: p.id, name: p.name, heat: Number((p.crowdLevel * 100).toFixed(1)) }))
+    crowdHeat: opMetrics.crowdHeat,
+    poiOperational: opMetrics.byPoiId,
+    metricDefinitions: {
+      ticketRemain: {
+        label: "门票余量",
+        source: opMetrics.source,
+        formula: "可售票=日承载上限-当前在园-渠道预留",
+        updatedAt: opMetrics.updatedAt
+      },
+      crowdPercent: {
+        label: "拥挤度",
+        source: opMetrics.source,
+        formula: "拥挤度=当前在园/日承载上限*100%",
+        updatedAt: opMetrics.updatedAt
+      }
+    }
   };
 }
 

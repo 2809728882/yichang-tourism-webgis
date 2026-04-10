@@ -135,6 +135,12 @@ AMAP_TRAFFIC_ROADS=东山大道,发展大道,沿江大道,夷陵大道,西陵一
 OPENAI_API_KEY=
 OPENAI_BASE_URL=
 OPENAI_MODEL=deepseek-chat
+
+# 景区实时指标（真实优先，模拟兜底）
+POI_REALTIME_ENDPOINT=
+POI_REALTIME_TOKEN=
+POI_REALTIME_SOURCE_NAME=真实票务+闸机
+POI_REALTIME_CACHE_SECONDS=60
 ```
 
 ## 主要 API
@@ -149,6 +155,45 @@ OPENAI_MODEL=deepseek-chat
 - `POST /api/user/:userId/itineraries`
 - `DELETE /api/user/:userId/itineraries/:id`
 - `POST /api/feedback`
+
+## 景区实时指标接口约定（联调用）
+
+系统会优先请求 `POI_REALTIME_ENDPOINT`，若接口不可用或字段缺失，则自动回退到本地模拟模型。
+
+### 请求方式
+
+- 方法：`GET`
+- Header（可选）：`Authorization: Bearer <POI_REALTIME_TOKEN>`
+
+### 响应样例（推荐）
+
+```json
+{
+  "items": {
+    "poi-1": {
+      "designCapacity": 8000,
+      "currentVisitors": 4120,
+      "reservedTickets": 320,
+      "updatedAt": "2026-04-10T10:05:00+08:00",
+      "source": "三峡大坝票务+闸机"
+    },
+    "poi-2": {
+      "ticketRemain": 1650,
+      "crowdPercent": 63.5,
+      "updatedAt": "2026-04-10T10:05:00+08:00"
+    }
+  }
+}
+```
+
+### 字段说明
+
+- `items`：对象结构，key 推荐使用项目内 `poiId`（也支持景点名称匹配）。
+- 可选输入 A（更完整）：`designCapacity` + `currentVisitors` + `reservedTickets`。
+- 可选输入 B（简化）：`ticketRemain` + `crowdPercent`。
+- 系统统一展示口径：
+  - 门票余量：`可售票=日承载上限-当前在园-渠道预留`
+  - 拥挤度：`拥挤度=当前在园/日承载上限*100%`
 
 ## 说明
 

@@ -61,6 +61,10 @@ export default function MapView({ pois, focusPoiId, heatData, routePath, routeLi
               <div>{poi.description}</div>
               <div>门票余量: {poi.ticketRemain}</div>
               <div>拥挤度: {(poi.crowdLevel * 100).toFixed(0)}%</div>
+              {poi.metricSource ? <div>数据来源: {poi.metricSource}</div> : null}
+              {poi.metricUpdatedAt ? <div>更新时间: {new Date(poi.metricUpdatedAt).toLocaleString()}</div> : null}
+              {poi.metricFormulas?.ticketRemain ? <div>票务口径: {poi.metricFormulas.ticketRemain}</div> : null}
+              {poi.metricFormulas?.crowdPercent ? <div>客流口径: {poi.metricFormulas.crowdPercent}</div> : null}
               {isFocus ? <div style={{ color: "#1677ff" }}>AI当前推荐景点</div> : null}
             </Popup>
           </Marker>

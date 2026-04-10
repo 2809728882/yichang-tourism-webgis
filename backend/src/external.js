@@ -49,6 +49,10 @@ const trafficCache = {
   ts: 0,
   data: null
 };
+const poiMetricsCache = {
+  ts: 0,
+  data: null
+};
 
 export async function fetchWeatherFromAmap() {
   const key = process.env.AMAP_WEATHER_KEY;
@@ -65,6 +69,58 @@ export async function fetchWeatherFromAmap() {
       temperature: Number(pick(live.temperature, 23)),
       wind: `${pick(live.winddirection, "东北")}风 ${pick(live.windpower, "2")}级`
     };
+  } catch {
+    return null;
+  }
+}
+
+function normalizePoiMetricsPayload(payload) {
+  if (!payload) return {};
+  if (Array.isArray(payload)) {
+    return payload.reduce((acc, item) => {
+      const key = String(item?.poiId || item?.id || item?.name || "").trim();
+      if (!key) return acc;
+      acc[key] = item;
+      return acc;
+    }, {});
+  }
+  if (Array.isArray(payload.items)) {
+    return normalizePoiMetricsPayload(payload.items);
+  }
+  if (payload.items && typeof payload.items === "object") {
+    return payload.items;
+  }
+  if (typeof payload === "object") return payload;
+  return {};
+}
+
+export async function fetchRealPoiMetrics() {
+  const endpoint = process.env.POI_REALTIME_ENDPOINT;
+  if (!endpoint) return null;
+
+  const now = Date.now();
+  const ttlMs = Math.max(30, Number(process.env.POI_REALTIME_CACHE_SECONDS || 60)) * 1000;
+  if (poiMetricsCache.data && now - poiMetricsCache.ts < ttlMs) {
+    return poiMetricsCache.data;
+  }
+
+  try {
+    const headers = {};
+    if (process.env.POI_REALTIME_TOKEN) {
+      headers.Authorization = `Bearer ${process.env.POI_REALTIME_TOKEN}`;
+    }
+    const resp = await fetch(endpoint, { headers });
+    if (!resp.ok) return null;
+    const json = await resp.json();
+    const items = normalizePoiMetricsPayload(json);
+    const data = {
+      source: process.env.POI_REALTIME_SOURCE_NAME || "真实票务+闸机",
+      sampledAt: new Date().toISOString(),
+      items
+    };
+    poiMetricsCache.ts = now;
+    poiMetricsCache.data = data;
+    return data;
   } catch {
     return null;
   }
