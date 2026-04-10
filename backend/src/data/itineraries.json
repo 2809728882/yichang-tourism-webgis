@@ -1,0 +1,47 @@
+{
+  "items": [
+    {
+      "id": "it-1775814379308",
+      "userId": "guest-001",
+      "title": "轻松行程",
+      "plan": {
+        "summary": "从宜昌东站出发，推荐 3 站行程，适合2人出行。",
+        "estimatedCostCNY": 460,
+        "riskTips": [
+          "中午时段热门景区排队较长",
+          "建议提前30分钟到达换乘点"
+        ],
+        "itinerary": [
+          {
+            "order": 1,
+            "poiId": "poi-5",
+            "poiName": "葛洲坝",
+            "arrival": "09:00",
+            "stayMinutes": 120,
+            "travelMode": "驾车",
+            "reason": "匹配轻松偏好，拥挤度 31%，综合得分 80.3"
+          },
+          {
+            "order": 2,
+            "poiId": "poi-4",
+            "poiName": "三峡大瀑布",
+            "arrival": "12:00",
+            "stayMinutes": 120,
+            "travelMode": "公交+步行",
+            "reason": "匹配轻松偏好，拥挤度 38%，综合得分 76.6"
+          },
+          {
+            "order": 3,
+            "poiId": "poi-3",
+            "poiName": "清江画廊",
+            "arrival": "15:00",
+            "stayMinutes": 120,
+            "travelMode": "游船+步行",
+            "reason": "匹配轻松偏好，拥挤度 46%，综合得分 75.1"
+          }
+        ]
+      },
+      "createdAt": "2026-04-10T09:46:19.308Z"
+    }
+  ]
+}
