@@ -1,18 +1,33 @@
-# 瀹滄父鏅哄浘锛圷ichang Tourism WebGIS锛塒RD澧炲己鐗?
+# 宜游智图 WebGIS
 
-鍩轰簬浣犵殑PRD鍗囩骇鍚庣殑鍙繍琛岀増鏈紝鏂板锛?
+面向宜昌游客的 WebGIS + AI 智能旅游系统（移动端优先）。
 
-- 鍙厤缃閮ˋPI閫傞厤灞傦紙楂樺痉澶╂皵/浜ら€氾級
-- AI闂瓟涓嫳鍙岃鏀寔锛堝彲鎺ュ叆OpenAI锛?- 鐢ㄦ埛涓績锛氭垜鐨勮绋嬩繚瀛?璇诲彇銆佸弽棣堟彁浜?- 鍚庡彴绠＄悊锛氱鐞嗗憳鐧诲綍銆佺粺璁℃暟鎹帴鍙?
+## 当前能力
 
-## 鐩綍缁撴瀯
+- 地图主视图：POI、客流热度、路线编号点、真实道路线路绘制
+- AI 路线规划：支持天数、时长、偏好、交通模式、人数
+- AI 智能问答：普通问答 + 客流问答 + 实时天气问答
+- 实时信息：天气、交通指数、路况来源与告警
+- 行程中心：保存行程、查看、再次应用、删除
+- 新手引导：3 步生成首条路线
+- 移动端适配：左侧功能面板 + 地图主视图 + 悬浮信息卡
 
-- `backend`锛歂ode.js + Express API
-- `frontend`锛歊eact + Vite WebGIS 鍓嶇
+## 技术栈
 
-## 蹇€熷惎鍔?
+- 前端：React + Vite + Leaflet
+- 后端：Node.js + Express
+- 外部服务：高德 API（天气、路况、路径）、Open-Meteo（免费天气备选）
+- AI：OpenAI 兼容接口（可配置 DeepSeek）
 
-### 1) 鍚姩鍚庣
+## 目录结构
+
+- `frontend`：前端工程
+- `backend`：后端 API
+- `docker-compose.yml`：容器化启动模板
+
+## 本地启动
+
+### 1) 启动后端
 
 ```bash
 cd backend
@@ -21,9 +36,9 @@ copy .env.example .env
 npm run dev
 ```
 
-鍚庣榛樿绔彛锛歚3010`
+默认端口：`3001`
 
-### 2) 鍚姩鍓嶇
+### 2) 启动前端
 
 ```bash
 cd frontend
@@ -31,11 +46,11 @@ npm install
 npm run dev
 ```
 
-鍓嶇榛樿绔彛锛歚888`
+默认端口：`888`
 
-璁块棶锛歚[[http://127.0.0.1:888`](http://127.0.0.1:888`)](http://127.0.0.1:888`](http://127.0.0.1:888`))
+访问地址：`http://127.0.0.1:888/`
 
-## 鐜鍙橀噺锛堝悗绔級
+## 后端环境变量（示例）
 
 ```bash
 PORT=3001
@@ -48,39 +63,29 @@ ADMIN_TOKEN=demo-admin-token
 AMAP_WEATHER_KEY=
 AMAP_TRAFFIC_KEY=
 AMAP_WEATHER_CITYCODE=420500
+AMAP_TRAFFIC_ADCODE=420500
+AMAP_TRAFFIC_ROADS=东山大道,发展大道,沿江大道,夷陵大道,西陵一路,港窑路
 
 OPENAI_API_KEY=
 OPENAI_BASE_URL=
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=deepseek-chat
 ```
 
-璇存槑锛?
-
-- 鏈厤缃?`AMAP_*` 鏃讹紝绯荤粺浣跨敤鍐呯疆瀹炴椂妯℃嫙鏁版嵁銆?- 鏈厤缃?`OPENAI_API_KEY` 鏃讹紝绯荤粺浣跨敤瑙勫垯鍥炲銆?
-
-## API娓呭崟
-
-### 娓稿绔?
+## 主要 API
 
 - `GET /api/health`
 - `GET /api/pois`
 - `GET /api/realtime`
 - `POST /api/plan-route`
 - `POST /api/chat`
+- `POST /api/route/geometry`（真实道路几何）
 - `GET /api/user/:userId/itineraries`
 - `POST /api/user/:userId/itineraries`
+- `DELETE /api/user/:userId/itineraries/:id`
 - `POST /api/feedback`
 
-### 绠＄悊绔?
+## 说明
 
-- `POST /api/admin/login`
-- `GET /api/admin/pois` (Bearer)
-- `POST /api/admin/pois` (Bearer)
-- `PUT /api/admin/pois/:id` (Bearer)
-- `DELETE /api/admin/pois/:id` (Bearer)
-- `GET /api/admin/stats` (Bearer)
-
-## 鍏抽敭鏀归€犺鏄?
-
-- 褰撳墠浠嶄娇鐢ㄥ唴瀛楶OI涓嶫SON鏂囦欢瀛樺偍鐢ㄦ埛鏁版嵁锛屽悗缁彲鍒囨崲鍒?PostgreSQL/PostGIS銆?- 宸蹭繚鐣欑湡瀹炲閮ˋPI鎺ュ叆鐐癸紝鎷垮埌Key鍗冲彲鍚敤銆?- 宸叉敮鎸佷腑鑻卞弻璇棶绛斿弬鏁帮紙`locale: zh/en`锛夈€?
-
+- 若高德路况接口异常，系统会自动降级并给出可读提示。
+- 若 AI 服务不可用，路线规划会自动回退到启发式方案。
+- 生产环境请确保 `.env` 不入库，避免泄露密钥。
